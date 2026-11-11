@@ -1,9 +1,10 @@
 -- DrawingClient.luau
--- Handles smooth mouse drawing on canvas
+-- Handles smooth mouse drawing on canvas with 2D camera mode
 
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local Remotes = require(ReplicatedStorage.Shared.RemoteEvents)
 
@@ -11,24 +12,24 @@ local DrawingClient = {}
 DrawingClient.CurrentCanvas = nil
 DrawingClient.IsDrawing = false
 DrawingClient.CurrentColor = Color3.fromRGB(0, 0, 0) -- Black
-DrawingClient.BrushSize = 10 -- Increased default size
+DrawingClient.BrushSize = 10
 DrawingClient.LastPosition = nil
+DrawingClient.CameraConnection = nil
+DrawingClient.OriginalCamera = nil
+DrawingClient.DrawingScreenGui = nil
 
--- Start drawing on a canvas
-function DrawingClient:StartDrawing(canvasId: string, surfaceGui: SurfaceGui)
+-- Start drawing on a canvas (with 2D camera mode)
+function DrawingClient:StartDrawing(canvasId: string, canvasPart: BasePart)
 	self.CurrentCanvas = {
 		Id = canvasId,
-		SurfaceGui = surfaceGui,
-		DrawingFrame = surfaceGui:FindFirstChild("DrawingFrame"),
+		Part = canvasPart,
 	}
 	
-	if not self.CurrentCanvas.DrawingFrame then
-		warn("[DrawingClient] No DrawingFrame found!")
-		return
-	end
+	-- Enter 2D camera mode
+	self:EnterCameraMode(canvasPart)
 	
-	self.IsDrawing = false
-	self.LastPosition = nil
+	-- Create fullscreen drawing GUI
+	self:CreateDrawingScreen()
 	
 	-- Connect input events
 	self:ConnectInputEvents()
@@ -36,23 +37,152 @@ function DrawingClient:StartDrawing(canvasId: string, surfaceGui: SurfaceGui)
 	print("[DrawingClient] Started drawing on canvas:", canvasId)
 end
 
--- Stop drawing
+-- Enter 2D camera mode focused on canvas
+function DrawingClient:EnterCameraMode(canvasPart: BasePart)
+	local player = Players.LocalPlayer
+	local camera = workspace.CurrentCamera
+	
+	-- Save original camera settings
+	self.OriginalCamera = {
+		CameraType = camera.CameraType,
+		CameraSubject = camera.CameraSubject,
+		CFrame = camera.CFrame,
+	}
+	
+	-- Set camera to scriptable
+	camera.CameraType = Enum.CameraType.Scriptable
+	
+	-- Position camera in front of canvas
+	local canvasCFrame = canvasPart.CFrame
+	local canvasSize = canvasPart.Size
+	
+	-- Calculate distance to fit canvas in view
+	local fov = math.rad(camera.FieldOfView)
+	local aspectRatio = camera.ViewportSize.X / camera.ViewportSize.Y
+	local maxDimension = math.max(canvasSize.X, canvasSize.Y)
+	local distance = (maxDimension / 2) / math.tan(fov / 2) + 5
+	
+	-- Position camera directly in front
+	camera.CFrame = canvasCFrame * CFrame.new(0, 0, distance)
+	
+	-- Lock camera in place
+	self.CameraConnection = RunService.RenderStepped:Connect(function()
+		if self.CurrentCanvas then
+			camera.CFrame = canvasCFrame * CFrame.new(0, 0, distance)
+		end
+	end)
+	
+	print("[DrawingClient] Entered 2D camera mode")
+end
+
+-- Exit camera mode and restore original camera
+function DrawingClient:ExitCameraMode()
+	local camera = workspace.CurrentCamera
+	
+	-- Disconnect camera lock
+	if self.CameraConnection then
+		self.CameraConnection:Disconnect()
+		self.CameraConnection = nil
+	end
+	
+	-- Restore original camera
+	if self.OriginalCamera then
+		camera.CameraType = self.OriginalCamera.CameraType
+		camera.CameraSubject = self.OriginalCamera.CameraSubject
+	end
+	
+	print("[DrawingClient] Exited 2D camera mode")
+end
+
+-- Create fullscreen drawing GUI
+function DrawingClient:CreateDrawingScreen()
+	local player = Players.LocalPlayer
+	local playerGui = player:WaitForChild("PlayerGui")
+	
+	-- Remove old GUI if exists
+	local oldGui = playerGui:FindFirstChild("DrawingScreen")
+	if oldGui then
+		oldGui:Destroy()
+	end
+	
+	-- Create new ScreenGui
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "DrawingScreen"
+	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	screenGui.DisplayOrder = 5
+	screenGui.Parent = playerGui
+	
+	-- Drawing Frame (white background)
+	local drawingFrame = Instance.new("Frame")
+	drawingFrame.Name = "DrawingFrame"
+	drawingFrame.Size = UDim2.fromScale(1, 1)
+	drawingFrame.Position = UDim2.fromScale(0, 0)
+	drawingFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	drawingFrame.BorderSizePixel = 0
+	drawingFrame.ZIndex = 1
+	drawingFrame.Parent = screenGui
+	
+	-- Exit button
+	local exitButton = Instance.new("TextButton")
+	exitButton.Name = "ExitButton"
+	exitButton.Size = UDim2.new(0, 120, 0, 40)
+	exitButton.Position = UDim2.new(0, 20, 0, 20)
+	exitButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+	exitButton.Text = "Exit Canvas"
+	exitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	exitButton.TextSize = 16
+	exitButton.Font = Enum.Font.GothamBold
+	exitButton.ZIndex = 10
+	exitButton.Parent = screenGui
+	
+	local exitCorner = Instance.new("UICorner")
+	exitCorner.CornerRadius = UDim.new(0, 8)
+	exitCorner.Parent = exitButton
+	
+	exitButton.MouseButton1Click:Connect(function()
+		self:ExitDrawingMode()
+	end)
+	
+	self.DrawingScreenGui = screenGui
+	self.DrawingFrame = drawingFrame
+end
+
+-- Exit drawing mode
+function DrawingClient:ExitDrawingMode()
+	if self.CurrentCanvas then
+		-- Notify server to unclaim
+		Remotes.UnclaimCanvas:FireServer(self.CurrentCanvas.Id)
+	end
+end
+
+-- Stop drawing and cleanup
 function DrawingClient:StopDrawing()
+	-- Exit camera mode
+	self:ExitCameraMode()
+	
+	-- Remove drawing screen
+	if self.DrawingScreenGui then
+		self.DrawingScreenGui:Destroy()
+		self.DrawingScreenGui = nil
+	end
+	
 	self.CurrentCanvas = nil
 	self.IsDrawing = false
 	self.LastPosition = nil
+	self.DrawingFrame = nil
+	
 	print("[DrawingClient] Stopped drawing")
 end
 
--- Connect mouse/touch input
+-- Connect mouse/touch input (simplified for 2D)
 function DrawingClient:ConnectInputEvents()
 	local mouse = Players.LocalPlayer:GetMouse()
 	
 	-- Mouse down - start drawing
 	mouse.Button1Down:Connect(function()
-		if not self.CurrentCanvas then return end
+		if not self.CurrentCanvas or not self.DrawingFrame then return end
 		
-		local position = self:GetCanvasPosition(mouse)
+		local position = self:GetCanvasPosition2D(mouse)
 		if position then
 			self.IsDrawing = true
 			self.LastPosition = position
@@ -83,9 +213,9 @@ function DrawingClient:ConnectInputEvents()
 	
 	-- Mouse move - draw stroke
 	mouse.Move:Connect(function()
-		if not self.IsDrawing or not self.CurrentCanvas then return end
+		if not self.IsDrawing or not self.CurrentCanvas or not self.DrawingFrame then return end
 		
-		local position = self:GetCanvasPosition(mouse)
+		local position = self:GetCanvasPosition2D(mouse)
 		if position and self.LastPosition then
 			-- Smooth line between last position and current
 			self:DrawLine(self.LastPosition, position, self.CurrentColor, self.BrushSize)
@@ -103,32 +233,16 @@ function DrawingClient:ConnectInputEvents()
 	end)
 end
 
--- Get position on canvas from mouse
-function DrawingClient:GetCanvasPosition(mouse): Vector2?
-	if not self.CurrentCanvas then return nil end
+-- Get position on canvas from mouse (2D screen coordinates)
+function DrawingClient:GetCanvasPosition2D(mouse): Vector2?
+	if not self.DrawingFrame then return nil end
 	
-	local surfaceGui = self.CurrentCanvas.SurfaceGui
-	local drawingFrame = self.CurrentCanvas.DrawingFrame
-	local surfacePart = surfaceGui.Parent
+	-- Get mouse position relative to drawing frame
+	local framePos = self.DrawingFrame.AbsolutePosition
+	local frameSize = self.DrawingFrame.AbsoluteSize
 	
-	-- Check if mouse is over the canvas
-	local target = mouse.Target
-	if not target or target ~= surfacePart then
-		return nil
-	end
-	
-	-- Use mouse.Hit to get 3D position on the part
-	local hitPosition = mouse.Hit.Position
-	local partCFrame = surfacePart.CFrame
-	local partSize = surfacePart.Size
-	
-	-- Convert world position to local position relative to part
-	local localPosition = partCFrame:PointToObjectSpace(hitPosition)
-	
-	-- Convert to UV coordinates (0-1 range)
-	-- Assuming SurfaceGui is on Front face
-	local relativeX = (localPosition.X / partSize.X) + 0.5
-	local relativeY = (-localPosition.Y / partSize.Y) + 0.5
+	local relativeX = (mouse.X - framePos.X) / frameSize.X
+	local relativeY = (mouse.Y - framePos.Y) / frameSize.Y
 	
 	-- Clamp to 0-1
 	relativeX = math.clamp(relativeX, 0, 1)
@@ -139,7 +253,7 @@ end
 
 -- Draw a single point
 function DrawingClient:DrawPoint(position: Vector2, color: Color3, size: number)
-	if not self.CurrentCanvas then return end
+	if not self.DrawingFrame then return end
 	
 	local frame = Instance.new("Frame")
 	frame.Size = UDim2.fromOffset(size, size)
@@ -148,7 +262,7 @@ function DrawingClient:DrawPoint(position: Vector2, color: Color3, size: number)
 	frame.BackgroundColor3 = color
 	frame.BorderSizePixel = 0
 	frame.ZIndex = 2
-	frame.Parent = self.CurrentCanvas.DrawingFrame
+	frame.Parent = self.DrawingFrame
 	
 	-- Make it circular
 	local corner = Instance.new("UICorner")
@@ -171,10 +285,13 @@ end
 
 -- Clear canvas
 function DrawingClient:ClearCanvas()
-	if not self.CurrentCanvas then return end
+	if not self.DrawingFrame then return end
 	
-	self.CurrentCanvas.DrawingFrame:ClearAllChildren()
-	Remotes.ClearCanvas:FireServer(self.CurrentCanvas.Id)
+	self.DrawingFrame:ClearAllChildren()
+	
+	if self.CurrentCanvas then
+		Remotes.ClearCanvas:FireServer(self.CurrentCanvas.Id)
+	end
 	
 	print("[DrawingClient] Cleared canvas")
 end
@@ -194,54 +311,53 @@ end
 -- Handle remote drawing from other players
 function DrawingClient:SetupRemoteDrawing()
 	Remotes.StartDrawing.OnClientEvent:Connect(function(canvasId, position, color, size)
-		-- Find the canvas
-		local canvasFolder = workspace:FindFirstChild("Canvases")
-		if not canvasFolder then return end
-		
-		local canvasPart = canvasFolder:FindFirstChild(canvasId)
-		if not canvasPart then return end
-		
-		local surfaceGui = canvasPart:FindFirstChild("DrawingSurface")
-		if not surfaceGui then return end
-		
-		local drawingFrame = surfaceGui:FindFirstChild("DrawingFrame")
-		if not drawingFrame then return end
-		
-		-- Draw the point
-		self:DrawPointOnFrame(drawingFrame, position, color, size)
+		-- Draw on SurfaceGui for spectators
+		self:DrawOnSurfaceGui(canvasId, position, color, size)
 	end)
 	
 	Remotes.DrawStroke.OnClientEvent:Connect(function(canvasId, position, color, size)
-		local canvasFolder = workspace:FindFirstChild("Canvases")
-		if not canvasFolder then return end
-		
-		local canvasPart = canvasFolder:FindFirstChild(canvasId)
-		if not canvasPart then return end
-		
-		local surfaceGui = canvasPart:FindFirstChild("DrawingSurface")
-		if not surfaceGui then return end
-		
-		local drawingFrame = surfaceGui:FindFirstChild("DrawingFrame")
-		if not drawingFrame then return end
-		
-		self:DrawPointOnFrame(drawingFrame, position, color, size)
+		-- Draw on SurfaceGui for spectators
+		self:DrawOnSurfaceGui(canvasId, position, color, size)
 	end)
 	
 	Remotes.ClearCanvas.OnClientEvent:Connect(function(canvasId)
-		local canvasFolder = workspace:FindFirstChild("Canvases")
-		if not canvasFolder then return end
-		
-		local canvasPart = canvasFolder:FindFirstChild(canvasId)
-		if not canvasPart then return end
-		
-		local surfaceGui = canvasPart:FindFirstChild("DrawingSurface")
-		if not surfaceGui then return end
-		
-		local drawingFrame = surfaceGui:FindFirstChild("DrawingFrame")
-		if drawingFrame then
-			drawingFrame:ClearAllChildren()
-		end
+		-- Clear SurfaceGui for spectators
+		self:ClearSurfaceGui(canvasId)
 	end)
+end
+
+-- Draw on SurfaceGui (for other players viewing from outside)
+function DrawingClient:DrawOnSurfaceGui(canvasId: string, position: Vector2, color: Color3, size: number)
+	local canvasFolder = workspace:FindFirstChild("Canvases")
+	if not canvasFolder then return end
+	
+	local canvasPart = canvasFolder:FindFirstChild(canvasId)
+	if not canvasPart then return end
+	
+	local surfaceGui = canvasPart:FindFirstChild("DrawingSurface")
+	if not surfaceGui then return end
+	
+	local drawingFrame = surfaceGui:FindFirstChild("DrawingFrame")
+	if not drawingFrame then return end
+	
+	self:DrawPointOnFrame(drawingFrame, position, color, size)
+end
+
+-- Clear SurfaceGui
+function DrawingClient:ClearSurfaceGui(canvasId: string)
+	local canvasFolder = workspace:FindFirstChild("Canvases")
+	if not canvasFolder then return end
+	
+	local canvasPart = canvasFolder:FindFirstChild(canvasId)
+	if not canvasPart then return end
+	
+	local surfaceGui = canvasPart:FindFirstChild("DrawingSurface")
+	if not surfaceGui then return end
+	
+	local drawingFrame = surfaceGui:FindFirstChild("DrawingFrame")
+	if drawingFrame then
+		drawingFrame:ClearAllChildren()
+	end
 end
 
 -- Helper to draw on specific frame

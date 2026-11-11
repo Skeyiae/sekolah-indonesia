@@ -276,10 +276,8 @@ function CanvasClient:OnCanvasClaimed(canvasId: string, owner: Player?)
 		if canvasFolder then
 			local canvasPart = canvasFolder:FindFirstChild(canvasId)
 			if canvasPart then
-				local surfaceGui = canvasPart:FindFirstChild("DrawingSurface")
-				if surfaceGui then
-					DrawingClient:StartDrawing(canvasId, surfaceGui)
-				end
+				-- Pass the part itself, not surfaceGui
+				DrawingClient:StartDrawing(canvasId, canvasPart)
 			end
 		end
 		
