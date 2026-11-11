@@ -110,19 +110,10 @@ function DrawingClient:CreateDrawingScreen()
 	screenGui.Name = "DrawingScreen"
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screenGui.DisplayOrder = 5
+	screenGui.IgnoreGuiInset = true
 	screenGui.Parent = playerGui
 	
-	-- Background (dark gray border)
-	local background = Instance.new("Frame")
-	background.Name = "Background"
-	background.Size = UDim2.fromScale(1, 1)
-	background.Position = UDim2.fromScale(0, 0)
-	background.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	background.BorderSizePixel = 0
-	background.ZIndex = 1
-	background.Parent = screenGui
-	
-	-- Drawing Frame (white canvas with padding)
+	-- Drawing Frame (white canvas with padding, no background)
 	local drawingFrame = Instance.new("Frame")
 	drawingFrame.Name = "DrawingFrame"
 	-- Add padding: 50px top/left, 370px right (for tools), 50px bottom
@@ -163,6 +154,36 @@ function DrawingClient:CreateDrawingScreen()
 	
 	self.DrawingScreenGui = screenGui
 	self.DrawingFrame = drawingFrame
+	
+	-- Copy existing drawings from SurfaceGui to ScreenGui
+	self:LoadExistingDrawings()
+end
+
+-- Load existing drawings from SurfaceGui (for persistence)
+function DrawingClient:LoadExistingDrawings()
+	if not self.CurrentCanvas or not self.DrawingFrame then return end
+	
+	local canvasFolder = workspace:FindFirstChild("Canvases")
+	if not canvasFolder then return end
+	
+	local canvasPart = canvasFolder:FindFirstChild(self.CurrentCanvas.Id)
+	if not canvasPart then return end
+	
+	local surfaceGui = canvasPart:FindFirstChild("DrawingSurface")
+	if not surfaceGui then return end
+	
+	local surfaceDrawingFrame = surfaceGui:FindFirstChild("DrawingFrame")
+	if not surfaceDrawingFrame then return end
+	
+	-- Clone all existing drawings
+	for _, child in ipairs(surfaceDrawingFrame:GetChildren()) do
+		if child:IsA("Frame") then
+			local clone = child:Clone()
+			clone.Parent = self.DrawingFrame
+		end
+	end
+	
+	print("[DrawingClient] Loaded existing drawings")
 end
 
 -- Exit drawing mode
@@ -273,10 +294,11 @@ function DrawingClient:GetCanvasPosition2D(mouse): Vector2?
 	return Vector2.new(relativeX, relativeY)
 end
 
--- Draw a single point
+-- Draw a single point (on both ScreenGui and SurfaceGui)
 function DrawingClient:DrawPoint(position: Vector2, color: Color3, size: number)
 	if not self.DrawingFrame then return end
 	
+	-- Draw on ScreenGui (for drawer)
 	local frame = Instance.new("Frame")
 	frame.Size = UDim2.fromOffset(size, size)
 	frame.Position = UDim2.fromScale(position.X, position.Y)
@@ -290,6 +312,30 @@ function DrawingClient:DrawPoint(position: Vector2, color: Color3, size: number)
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(1, 0)
 	corner.Parent = frame
+	
+	-- Also draw on SurfaceGui (for spectators to see in real-time)
+	if self.CurrentCanvas then
+		self:DrawOnSurfaceGuiLocal(position, color, size)
+	end
+end
+
+-- Draw on local SurfaceGui (for real-time spectating)
+function DrawingClient:DrawOnSurfaceGuiLocal(position: Vector2, color: Color3, size: number)
+	if not self.CurrentCanvas then return end
+	
+	local canvasFolder = workspace:FindFirstChild("Canvases")
+	if not canvasFolder then return end
+	
+	local canvasPart = canvasFolder:FindFirstChild(self.CurrentCanvas.Id)
+	if not canvasPart then return end
+	
+	local surfaceGui = canvasPart:FindFirstChild("DrawingSurface")
+	if not surfaceGui then return end
+	
+	local drawingFrame = surfaceGui:FindFirstChild("DrawingFrame")
+	if not drawingFrame then return end
+	
+	self:DrawPointOnFrame(drawingFrame, position, color, size)
 end
 
 -- Draw smooth line between two points
@@ -312,17 +358,42 @@ function DrawingClient:DrawLine(startPos: Vector2, endPos: Vector2, color: Color
 	end
 end
 
--- Clear canvas
+-- Clear canvas (both ScreenGui and SurfaceGui)
 function DrawingClient:ClearCanvas()
-	if not self.DrawingFrame then return end
+	-- Clear ScreenGui
+	if self.DrawingFrame then
+		self.DrawingFrame:ClearAllChildren()
+	end
 	
-	self.DrawingFrame:ClearAllChildren()
+	-- Clear SurfaceGui
+	if self.CurrentCanvas then
+		self:ClearSurfaceGuiLocal()
+	end
 	
 	if self.CurrentCanvas then
 		Remotes.ClearCanvas:FireServer(self.CurrentCanvas.Id)
 	end
 	
 	print("[DrawingClient] Cleared canvas")
+end
+
+-- Clear local SurfaceGui
+function DrawingClient:ClearSurfaceGuiLocal()
+	if not self.CurrentCanvas then return end
+	
+	local canvasFolder = workspace:FindFirstChild("Canvases")
+	if not canvasFolder then return end
+	
+	local canvasPart = canvasFolder:FindFirstChild(self.CurrentCanvas.Id)
+	if not canvasPart then return end
+	
+	local surfaceGui = canvasPart:FindFirstChild("DrawingSurface")
+	if not surfaceGui then return end
+	
+	local drawingFrame = surfaceGui:FindFirstChild("DrawingFrame")
+	if drawingFrame then
+		drawingFrame:ClearAllChildren()
+	end
 end
 
 -- Change draw color
