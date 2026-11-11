@@ -40,7 +40,7 @@ function CanvasClient:CreateUI()
 	-- Main Frame
 	local mainFrame = Instance.new("Frame")
 	mainFrame.Name = "MainFrame"
-	mainFrame.Size = UDim2.new(0, 300, 0, 200)
+	mainFrame.Size = UDim2.new(0, 300, 0, 220)
 	mainFrame.Position = UDim2.new(1, -320, 0, 20)
 	mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 	mainFrame.BorderSizePixel = 0
@@ -118,26 +118,113 @@ function CanvasClient:CreateUI()
 	
 	-- Brush Size Slider
 	local sizeLabel = Instance.new("TextLabel")
+	sizeLabel.Name = "SizeLabel"
 	sizeLabel.Size = UDim2.new(1, -20, 0, 20)
 	sizeLabel.Position = UDim2.new(0, 10, 0, 115)
 	sizeLabel.BackgroundTransparency = 1
-	sizeLabel.Text = "Brush Size: 3"
+	sizeLabel.Text = "Brush Size: 10"
 	sizeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	sizeLabel.TextSize = 14
 	sizeLabel.Font = Enum.Font.Gotham
 	sizeLabel.TextXAlignment = Enum.TextXAlignment.Left
 	sizeLabel.Parent = mainFrame
 	
-	local sizeSlider = Instance.new("Frame")
-	sizeSlider.Size = UDim2.new(1, -20, 0, 10)
-	sizeSlider.Position = UDim2.new(0, 10, 0, 140)
-	sizeSlider.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-	sizeSlider.BorderSizePixel = 0
-	sizeSlider.Parent = mainFrame
+	-- Slider Background
+	local sizeSliderBg = Instance.new("Frame")
+	sizeSliderBg.Name = "SliderBg"
+	sizeSliderBg.Size = UDim2.new(1, -20, 0, 20)
+	sizeSliderBg.Position = UDim2.new(0, 10, 0, 140)
+	sizeSliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	sizeSliderBg.BorderSizePixel = 0
+	sizeSliderBg.Parent = mainFrame
 	
-	local sliderCorner = Instance.new("UICorner")
-	sliderCorner.CornerRadius = UDim.new(0, 5)
-	sliderCorner.Parent = sizeSlider
+	local sliderBgCorner = Instance.new("UICorner")
+	sliderBgCorner.CornerRadius = UDim.new(0, 10)
+	sliderBgCorner.Parent = sizeSliderBg
+	
+	-- Slider Fill
+	local sizeSliderFill = Instance.new("Frame")
+	sizeSliderFill.Name = "SliderFill"
+	sizeSliderFill.Size = UDim2.new(0.11, 0, 1, 0) -- 10/50 = 0.2 for default size 10
+	sizeSliderFill.Position = UDim2.new(0, 0, 0, 0)
+	sizeSliderFill.BackgroundColor3 = Color3.fromRGB(80, 200, 255)
+	sizeSliderFill.BorderSizePixel = 0
+	sizeSliderFill.Parent = sizeSliderBg
+	
+	local sliderFillCorner = Instance.new("UICorner")
+	sliderFillCorner.CornerRadius = UDim.new(0, 10)
+	sliderFillCorner.Parent = sizeSliderFill
+	
+	-- Slider Button (draggable)
+	local sliderButton = Instance.new("TextButton")
+	sliderButton.Name = "SliderButton"
+	sliderButton.Size = UDim2.new(0, 20, 0, 30)
+	sliderButton.Position = UDim2.new(0.11, -10, 0.5, -15)
+	sliderButton.AnchorPoint = Vector2.new(0, 0.5)
+	sliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	sliderButton.Text = ""
+	sliderButton.AutoButtonColor = false
+	sliderButton.Parent = sizeSliderBg
+	
+	local sliderButtonCorner = Instance.new("UICorner")
+	sliderButtonCorner.CornerRadius = UDim.new(0, 10)
+	sliderButtonCorner.Parent = sliderButton
+	
+	-- Slider functionality
+	local UserInputService = game:GetService("UserInputService")
+	local dragging = false
+	
+	sliderButton.MouseButton1Down:Connect(function()
+		dragging = true
+	end)
+	
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+	
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local mousePos = UserInputService:GetMouseLocation()
+			local sliderPos = sizeSliderBg.AbsolutePosition.X
+			local sliderSize = sizeSliderBg.AbsoluteSize.X
+			
+			-- Calculate relative position (0-1)
+			local relativePos = (mousePos.X - sliderPos) / sliderSize
+			relativePos = math.clamp(relativePos, 0, 1)
+			
+			-- Update slider visual
+			sizeSliderFill.Size = UDim2.new(relativePos, 0, 1, 0)
+			sliderButton.Position = UDim2.new(relativePos, -10, 0.5, -15)
+			
+			-- Calculate brush size (5-50 range)
+			local brushSize = math.floor(5 + (relativePos * 45))
+			DrawingClient:SetBrushSize(brushSize)
+			sizeLabel.Text = "Brush Size: " .. brushSize
+		end
+	end)
+	
+	-- Click on slider background to jump
+	sizeSliderBg.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			local mousePos = UserInputService:GetMouseLocation()
+			local sliderPos = sizeSliderBg.AbsolutePosition.X
+			local sliderSize = sizeSliderBg.AbsoluteSize.X
+			
+			local relativePos = (mousePos.X - sliderPos) / sliderSize
+			relativePos = math.clamp(relativePos, 0, 1)
+			
+			sizeSliderFill.Size = UDim2.new(relativePos, 0, 1, 0)
+			sliderButton.Position = UDim2.new(relativePos, -10, 0.5, -15)
+			
+			local brushSize = math.floor(5 + (relativePos * 45))
+			DrawingClient:SetBrushSize(brushSize)
+			sizeLabel.Text = "Brush Size: " .. brushSize
+			
+			dragging = true
+		end
+	end)
 	
 	-- Clear Button
 	local clearButton = Instance.new("TextButton")

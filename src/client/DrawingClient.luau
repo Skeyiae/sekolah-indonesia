@@ -11,7 +11,7 @@ local DrawingClient = {}
 DrawingClient.CurrentCanvas = nil
 DrawingClient.IsDrawing = false
 DrawingClient.CurrentColor = Color3.fromRGB(0, 0, 0) -- Black
-DrawingClient.BrushSize = 3
+DrawingClient.BrushSize = 10 -- Increased default size
 DrawingClient.LastPosition = nil
 
 -- Start drawing on a canvas
@@ -109,19 +109,26 @@ function DrawingClient:GetCanvasPosition(mouse): Vector2?
 	
 	local surfaceGui = self.CurrentCanvas.SurfaceGui
 	local drawingFrame = self.CurrentCanvas.DrawingFrame
+	local surfacePart = surfaceGui.Parent
 	
 	-- Check if mouse is over the canvas
 	local target = mouse.Target
-	if not target or target ~= surfaceGui.Parent then
+	if not target or target ~= surfacePart then
 		return nil
 	end
 	
-	-- Get mouse position relative to canvas
-	local guiPosition = drawingFrame.AbsolutePosition
-	local guiSize = drawingFrame.AbsoluteSize
+	-- Use mouse.Hit to get 3D position on the part
+	local hitPosition = mouse.Hit.Position
+	local partCFrame = surfacePart.CFrame
+	local partSize = surfacePart.Size
 	
-	local relativeX = (mouse.X - guiPosition.X) / guiSize.X
-	local relativeY = (mouse.Y - guiPosition.Y) / guiSize.Y
+	-- Convert world position to local position relative to part
+	local localPosition = partCFrame:PointToObjectSpace(hitPosition)
+	
+	-- Convert to UV coordinates (0-1 range)
+	-- Assuming SurfaceGui is on Front face
+	local relativeX = (localPosition.X / partSize.X) + 0.5
+	local relativeY = (-localPosition.Y / partSize.Y) + 0.5
 	
 	-- Clamp to 0-1
 	relativeX = math.clamp(relativeX, 0, 1)
@@ -180,7 +187,7 @@ end
 
 -- Change brush size
 function DrawingClient:SetBrushSize(size: number)
-	self.BrushSize = math.clamp(size, 1, 20)
+	self.BrushSize = math.clamp(size, 5, 50) -- Increased range
 	print("[DrawingClient] Brush size changed to:", self.BrushSize)
 end
 
