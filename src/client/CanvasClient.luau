@@ -35,13 +35,14 @@ function CanvasClient:CreateUI()
 	screenGui.Name = "DrawingUI"
 	screenGui.ResetOnSpawn = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	screenGui.DisplayOrder = 10 -- Higher than DrawingScreen (5)
 	screenGui.Parent = playerGui
 	
 	-- Main Frame
 	local mainFrame = Instance.new("Frame")
 	mainFrame.Name = "MainFrame"
-	mainFrame.Size = UDim2.new(0, 300, 0, 220)
-	mainFrame.Position = UDim2.new(1, -320, 0, 20)
+	mainFrame.Size = UDim2.new(0, 320, 0, 220)
+	mainFrame.Position = UDim2.new(1, -340, 0, 50) -- Right side with padding
 	mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 	mainFrame.BorderSizePixel = 0
 	mainFrame.Visible = false

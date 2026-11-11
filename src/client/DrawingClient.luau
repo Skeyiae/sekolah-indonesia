@@ -94,7 +94,7 @@ function DrawingClient:ExitCameraMode()
 	print("[DrawingClient] Exited 2D camera mode")
 end
 
--- Create fullscreen drawing GUI
+-- Create fullscreen drawing GUI with padding
 function DrawingClient:CreateDrawingScreen()
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
@@ -112,21 +112,39 @@ function DrawingClient:CreateDrawingScreen()
 	screenGui.DisplayOrder = 5
 	screenGui.Parent = playerGui
 	
-	-- Drawing Frame (white background)
+	-- Background (dark gray border)
+	local background = Instance.new("Frame")
+	background.Name = "Background"
+	background.Size = UDim2.fromScale(1, 1)
+	background.Position = UDim2.fromScale(0, 0)
+	background.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	background.BorderSizePixel = 0
+	background.ZIndex = 1
+	background.Parent = screenGui
+	
+	-- Drawing Frame (white canvas with padding)
 	local drawingFrame = Instance.new("Frame")
 	drawingFrame.Name = "DrawingFrame"
-	drawingFrame.Size = UDim2.fromScale(1, 1)
-	drawingFrame.Position = UDim2.fromScale(0, 0)
+	-- Add padding: 50px top/left, 370px right (for tools), 50px bottom
+	drawingFrame.Size = UDim2.new(1, -420, 1, -100)
+	drawingFrame.Position = UDim2.new(0, 50, 0, 50)
 	drawingFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	drawingFrame.BorderSizePixel = 0
-	drawingFrame.ZIndex = 1
+	drawingFrame.BorderSizePixel = 2
+	drawingFrame.BorderColor3 = Color3.fromRGB(200, 200, 200)
+	drawingFrame.ZIndex = 2
 	drawingFrame.Parent = screenGui
+	
+	-- Corner for canvas
+	local canvasCorner = Instance.new("UICorner")
+	canvasCorner.CornerRadius = UDim.new(0, 8)
+	canvasCorner.Parent = drawingFrame
 	
 	-- Exit button
 	local exitButton = Instance.new("TextButton")
 	exitButton.Name = "ExitButton"
 	exitButton.Size = UDim2.new(0, 120, 0, 40)
-	exitButton.Position = UDim2.new(0, 20, 0, 20)
+	exitButton.Position = UDim2.new(0, 50, 0, 5)
+	exitButton.AnchorPoint = Vector2.new(0, 0)
 	exitButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
 	exitButton.Text = "Exit Canvas"
 	exitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -174,7 +192,7 @@ function DrawingClient:StopDrawing()
 	print("[DrawingClient] Stopped drawing")
 end
 
--- Connect mouse/touch input (simplified for 2D)
+-- Connect mouse/touch input (improved for smooth drawing)
 function DrawingClient:ConnectInputEvents()
 	local mouse = Players.LocalPlayer:GetMouse()
 	
@@ -211,24 +229,28 @@ function DrawingClient:ConnectInputEvents()
 		end
 	end)
 	
-	-- Mouse move - draw stroke
-	mouse.Move:Connect(function()
+	-- Use RenderStepped for smoother drawing (runs every frame)
+	RunService.RenderStepped:Connect(function()
 		if not self.IsDrawing or not self.CurrentCanvas or not self.DrawingFrame then return end
 		
 		local position = self:GetCanvasPosition2D(mouse)
 		if position and self.LastPosition then
-			-- Smooth line between last position and current
-			self:DrawLine(self.LastPosition, position, self.CurrentColor, self.BrushSize)
-			
-			-- Send to server
-			Remotes.DrawStroke:FireServer(
-				self.CurrentCanvas.Id,
-				position,
-				self.CurrentColor,
-				self.BrushSize
-			)
-			
-			self.LastPosition = position
+			-- Check if moved significantly (avoid too many duplicate points)
+			local distance = (position - self.LastPosition).Magnitude
+			if distance > 0.001 then -- Only draw if moved
+				-- Smooth line between last position and current
+				self:DrawLine(self.LastPosition, position, self.CurrentColor, self.BrushSize)
+				
+				-- Send to server (throttled)
+				Remotes.DrawStroke:FireServer(
+					self.CurrentCanvas.Id,
+					position,
+					self.CurrentColor,
+					self.BrushSize
+				)
+				
+				self.LastPosition = position
+			end
 		end
 	end)
 end
@@ -272,9 +294,16 @@ end
 
 -- Draw smooth line between two points
 function DrawingClient:DrawLine(startPos: Vector2, endPos: Vector2, color: Color3, size: number)
-	-- Interpolate points for smooth line
-	local distance = (endPos - startPos).Magnitude
-	local steps = math.max(math.floor(distance * 100), 1) -- More steps = smoother
+	if not self.DrawingFrame then return end
+	
+	-- Calculate pixel distance for better interpolation
+	local frameSize = self.DrawingFrame.AbsoluteSize
+	local pixelStart = Vector2.new(startPos.X * frameSize.X, startPos.Y * frameSize.Y)
+	local pixelEnd = Vector2.new(endPos.X * frameSize.X, endPos.Y * frameSize.Y)
+	local pixelDistance = (pixelEnd - pixelStart).Magnitude
+	
+	-- More steps for longer distances (1 point per 2 pixels minimum)
+	local steps = math.max(math.ceil(pixelDistance / 2), 1)
 	
 	for i = 0, steps do
 		local alpha = i / steps
