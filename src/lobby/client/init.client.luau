@@ -82,7 +82,7 @@ local function createLobbyUI()
 			Order = 2
 		},
 		{
-			Name = "WinBox Lab",
+			Name = "Simulation Mikrotik",
 			Icon = "🌐",
 			Description = "Learn networking!",
 			Destination = "WinBox",

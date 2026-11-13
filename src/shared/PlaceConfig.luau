@@ -6,10 +6,10 @@ local PlaceConfig = {}
 
 -- Place IDs (Update after publishing!)
 PlaceConfig.Places = {
-	Lobby = 0,      -- TODO: Update after publishing lobby
-	Quiz = 0,       -- TODO: Update after publishing quiz
-	Drawing = 0,    -- TODO: Update after publishing drawing
-	WinBox = 0,     -- TODO: Update after publishing winbox (future)
+	Lobby = 84560064741571,      -- Lobby/Hub
+	Quiz = 94193728430263,       -- Quiz Area
+	Drawing = 89762625143846,    -- Drawing Studio
+	WinBox = 83843058248260,     -- Simulation Mikrotik
 }
 
 -- Place Names
@@ -17,7 +17,7 @@ PlaceConfig.PlaceNames = {
 	[PlaceConfig.Places.Lobby] = "Lobby",
 	[PlaceConfig.Places.Quiz] = "Quiz Arena",
 	[PlaceConfig.Places.Drawing] = "Drawing Studio",
-	[PlaceConfig.Places.WinBox] = "WinBox Lab",
+	[PlaceConfig.Places.WinBox] = "Simulation Mikrotik",
 }
 
 -- Get current place name
