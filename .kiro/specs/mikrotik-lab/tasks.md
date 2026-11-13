@@ -1,161 +1,122 @@
-# Simulation Mikrotik - Implementation Tasks
+# Simulation Mikrotik - Implementation Tasks (Hotbar-based System)
 
-## Phase 1: Core Device System (Foundation)
+## Phase 1: Hotbar + Basic Placement (MVP)
 
-### Task 1: Create DeviceTypes module and data structures
-**Description:** Define all device types, their properties, ports, and base configurations.
+### Task 1: Create DeviceTypes module with device definitions
+**Description:** Define all 6 device types with their properties (size, color, default config).
 
 **Sub-tasks:**
-- [ ] Create DeviceTypes enum (Router, Switch, Server, Firewall, AP)
-- [ ] Define device properties (size, color, port count, defaults)
+- [ ] Create device type enum (PC, Switch, Router, Firewall, AP, Server)
+- [ ] Define device properties (size, color, display name, default IP)
 - [ ] Create device instance structure (ID, owner, position, rotation, config)
-- [ ] Create port structure (port ID, port type, connection ID)
-- [ ] Add helper functions for device validation
+- [ ] Create helper functions for type checking and creation
 
-**Input:**
-- Device specifications from spec.md
-
-**Output:**
-- `src/simulation-mikrotik/shared/DeviceTypes.luau`
+**Output:** `src/simulation-mikrotik/shared/DeviceTypes.luau`
 
 ---
 
-### Task 2: Create server DeviceManager
-**Description:** Manage device creation, deletion, placement, and ownership validation.
+### Task 2: Create server DeviceManager for tracking placed devices
+**Description:** Manage device creation, deletion, and server-side state.
 
 **Sub-tasks:**
-- [ ] Create DeviceManager class with methods for CRUD operations
-- [ ] Implement device creation (spawn model, setup properties)
-- [ ] Implement device deletion (remove model, cleanup connections)
-- [ ] Implement device movement/rotation
-- [ ] Add ownership validation (only owner can modify)
-- [ ] Setup RemoteEvent listeners for device actions
+- [ ] Create DeviceManager class with methods (PlaceDevice, RemoveDevice, UpdateConfig, GetDevices)
+- [ ] Implement device instance creation (store in table, assign IDs)
+- [ ] Implement device deletion/cleanup
+- [ ] Track device positions and configurations
+- [ ] Setup RemoteEvent listeners
 
-**Input:**
-- DeviceTypes module
-- Device specifications
-
-**Output:**
-- `src/simulation-mikrotik/server/DeviceManager.luau`
+**Output:** `src/simulation-mikrotik/server/DeviceManager.luau`
 
 ---
 
-### Task 3: Create 3D device models
-**Description:** Build geometric 3D models for each device type using Roblox parts.
+### Task 3: Create default Part-based 3D models for devices
+**Description:** Build simple Part-based models for each device type (don't make fancy, just simple boxes with correct colors/sizes).
 
 **Sub-tasks:**
-- [ ] Create Router model (blue box with 4 port indicators)
-- [ ] Create Switch model (gray box with 8+ port indicators)
-- [ ] Create Server model (green tower with 1 port)
-- [ ] Create Firewall model (red box with 2 ports)
-- [ ] Create AP model (yellow box with antenna)
-- [ ] Add model factory function that returns cloneable model
+- [ ] PC model (gray box, 10x2x8, with label "PC")
+- [ ] Switch model (light gray box, 12x2x6, with label "Switch")
+- [ ] Router model (blue box, 10x4x6, with label "Router")
+- [ ] Firewall model (red box, 8x3x6, with label "Firewall")
+- [ ] AP model (yellow box, 6x6x8, with antenna decal/indicator)
+- [ ] Server model (green tower, 6x6x10, with label "Server")
+- [ ] Create factory function to clone models
 
-**Input:**
-- Device visual specs from spec.md
-
-**Output:**
-- `src/simulation-mikrotik/server/DeviceModels.luau` (or inline in DeviceManager)
-- Actual 3D models in workspace template
+**Output:** Function in DeviceManager or separate ModelFactory.luau
 
 ---
 
-### Task 4: Create client InputHandler for device placement
-**Description:** Handle mouse input for selecting and placing devices on grid.
+### Task 4: Create client PlacementSystem for placing devices
+**Description:** Handle hotbar click → placement mode → ghost model → place device.
 
 **Sub-tasks:**
-- [ ] Create grid snapping system (0.5 stud grid)
-- [ ] Implement device preview on mouse movement
-- [ ] Implement placement validation (no overlap, within bounds)
-- [ ] Connect placement buttons to placement mode
-- [ ] Add visual feedback (ghost model, grid highlight)
-- [ ] Send placement request to server
+- [ ] Implement placement mode activation
+- [ ] Show ghost model following mouse
+- [ ] Validate placement (not inside things, within bounds)
+- [ ] Detect click to place
+- [ ] Send PlaceDevice RemoteEvent to server
+- [ ] Exit placement mode after successful placement
 
-**Input:**
-- DeviceTypes
-- UI button structure
-
-**Output:**
-- `src/simulation-mikrotik/client/InputHandler.luau`
+**Output:** `src/simulation-mikrotik/client/PlacementSystem.luau`
 
 ---
 
-### Task 5: Create client DeviceUI menu
-**Description:** Create main menu for device selection and tools.
+### Task 5: Create client HotbarUI
+**Description:** Bottom-screen UI showing 6 device types as clickable buttons.
 
 **Sub-tasks:**
-- [ ] Create floating ScreenGui panel
-- [ ] Add device type buttons (Router, Switch, Server, Firewall, AP)
-- [ ] Add tool buttons (Config, Stats, Test, Delete, Save)
-- [ ] Connect buttons to appropriate handlers
-- [ ] Add visual feedback (hover effects, active states)
-- [ ] Position panel appropriately on screen
+- [ ] Create ScreenGui at bottom of screen
+- [ ] Add 6 device buttons (PC, Switch, Router, Firewall, AP, Server)
+- [ ] Add hover effects (highlight on mouse over)
+- [ ] Connect buttons to PlacementSystem
+- [ ] Show current placement status
+- [ ] Position and style appropriately
 
-**Input:**
-- UI design from spec.md
-- RemoteEvent system
-
-**Output:**
-- `src/simulation-mikrotik/client/DeviceUI.luau`
+**Output:** `src/simulation-mikrotik/client/HotbarUI.luau`
 
 ---
 
 ### Task 6: Create NetworkRemotes module
-**Description:** Setup all RemoteEvents and RemoteFunctions for Simulation Mikrotik communication.
+**Description:** All RemoteEvents needed for device placement and interaction.
 
 **Sub-tasks:**
-- [ ] Create RemoteEvent for device placement
-- [ ] Create RemoteEvent for device deletion
-- [ ] Create RemoteEvent for device configuration updates
-- [ ] Create RemoteEvent for connection creation/deletion
-- [ ] Create RemoteEvent for network state sync
-- [ ] Create RemoteFunction for permission validation
+- [ ] RemoteEvent: PlaceDevice(deviceType, position, rotation)
+- [ ] RemoteEvent: RemoveDevice(deviceID)
+- [ ] RemoteEvent: UpdateDeviceConfig(deviceID, config)
+- [ ] RemoteEvent: DevicePlaced (broadcast to all clients)
+- [ ] RemoteEvent: DeviceRemoved (broadcast to all clients)
+- [ ] RemoteEvent: DeviceConfigUpdated (broadcast)
 
-**Input:**
-- Feature requirements
-- Multi-player scenarios
-
-**Output:**
-- `src/simulation-mikrotik/shared/NetworkRemotes.luau`
+**Output:** `src/simulation-mikrotik/shared/NetworkRemotes.luau`
 
 ---
 
-### Task 7: Create server init and setup workspace
-**Description:** Initialize server systems and setup simulation place structure.
+### Task 7: Create server init and setup
+**Description:** Initialize all server systems and setup remotes.
 
 **Sub-tasks:**
 - [ ] Create `init.server.luau` entry point
 - [ ] Initialize DeviceManager
-- [ ] Setup RemoteEvent handlers
-- [ ] Create arena/workspace boundaries
-- [ ] Setup player management (track player networks)
-- [ ] Initialize PersistenceManager (load saved networks)
+- [ ] Setup all remote listeners
+- [ ] Create arena boundaries (optional)
+- [ ] Setup player tracking
+- [ ] Load persisted networks on server start
 
-**Input:**
-- All server modules
-- Place structure
-
-**Output:**
-- `src/simulation-mikrotik/server/init.server.luau`
+**Output:** `src/simulation-mikrotik/server/init.server.luau`
 
 ---
 
 ### Task 8: Create client init
-**Description:** Initialize client systems and setup UI.
+**Description:** Initialize all client systems.
 
 **Sub-tasks:**
 - [ ] Create `init.client.luau` entry point
-- [ ] Initialize DeviceUI
-- [ ] Initialize InputHandler
+- [ ] Initialize HotbarUI
+- [ ] Initialize PlacementSystem
+- [ ] Initialize DeviceRaycast (for clicking devices)
 - [ ] Initialize CameraController
-- [ ] Setup network sync listeners
-- [ ] Connect button events to handlers
+- [ ] Listen for device sync events
 
-**Input:**
-- All client modules
-
-**Output:**
-- `src/simulation-mikrotik/client/init.client.luau`
+**Output:** `src/simulation-mikrotik/client/init.client.luau`
 
 ---
 

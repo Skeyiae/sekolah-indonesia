@@ -2,9 +2,21 @@
 
 ## Project Overview
 
-**Goal:** Build an interactive 3D network simulation system in Roblox where players can design, configure, and monitor MikroTik networks.
+**Goal:** Build an interactive 3D network simulation system in Roblox where players can freely place networking devices (PC, Switch, Router, etc.), configure them with IP addresses, and monitor connectivity - similar to a physical WinBox interface.
 
-**Target:** Educational/training platform for networking concepts with real-time visualization.
+**Gameplay Model:** Inventory hotbar system with unlimited item placement, click-to-interact context menu, and WinBox-style configuration panels.
+
+**Target:** Educational/training platform for networking concepts with hands-on device placement and configuration.
+
+---
+
+## Core Gameplay Loop
+
+1. **Hotbar System** - Bottom-screen UI showing available devices (PC, Switch, Router, Firewall, AP, Server)
+2. **Placement** - Click device → ghost model follows mouse → click to place (unlimited placement)
+3. **Interaction** - Click placed device → Context menu (Remove/Configure/Info)
+4. **Configuration** - Click Configure → WinBox-style panel for IP address, DHCP settings
+5. **Monitoring** - See real-time connectivity, ping between devices
 
 ---
 
@@ -16,82 +28,88 @@
 SimulationMikrotik (Place)
 │
 ├─ Server Systems
-│  ├─ DeviceManager - Create/delete/track devices
-│  ├─ ConnectionManager - Handle cable connections
-│  ├─ ConfigurationManager - Store device configs
-│  ├─ SimulationEngine - Run network simulation
-│  └─ PersistenceManager - Save to DataStore
+│  ├─ DeviceManager - Create/delete/track placed devices
+│  ├─ ConfigurationManager - Store device IP/configs
+│  ├─ SimulationEngine - Check connectivity
+│  ├─ PersistenceManager - Save/load networks
+│  └─ NetworkRemotes - Remote event handlers
 │
 ├─ Client Systems
-│  ├─ DeviceUI - Placement and interaction
-│  ├─ ConfigPanel - SurfaceGui configuration
-│  ├─ NetworkVisualization - Traffic rendering
-│  ├─ InputHandler - Mouse/selection logic
-│  └─ CameraController - Free look camera
+│  ├─ HotbarUI - Bottom inventory bar (PC, Switch, Router, etc)
+│  ├─ PlacementSystem - Ghost model + placement mode
+│  ├─ InteractionUI - Click menu (Remove/Configure/Info)
+│  ├─ ConfigPanel - WinBox-style IP/settings panel
+│  ├─ DeviceRaycast - Click detection for placed devices
+│  ├─ CameraController - Free look around
+│  └─ MonitoringUI - Network stats display
 │
 └─ Shared Systems
-   ├─ DeviceTypes - Type definitions
-   ├─ NetworkRemotes - Remote events
+   ├─ DeviceTypes - Device definitions
+   ├─ NetworkRemotes - Remote events list
    └─ Constants - Shared configs
 ```
 
 ### Data Flow
 
 ```
-Player Action
+Player clicks hotbar item "Switch"
     ↓
-Client InputHandler
+PlacementSystem: Enter placement mode, show ghost
     ↓
-RemoteEvent to Server
+Player moves mouse + sees ghost follow
     ↓
-Server DeviceManager/ConnectionManager
+Player clicks to place
     ↓
-Update DataStore
+Client sends PlaceDevice RemoteEvent
     ↓
-Broadcast to all players (RemoteEvent)
+Server: Create switch model, store data
     ↓
-Client updates visualization
+Server: Broadcast to all clients
+    ↓
+All clients: Show new switch in world
+    ↓
+Player clicks switch model
+    ↓
+Client: Show context menu (Remove / Configure)
+    ↓
+Player clicks Configure
+    ↓
+Client: Show WinBox IP panel
+    ↓
+Player enters IP, saves
+    ↓
+Server: Store config, broadcast update
 ```
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Core Device System (Foundation)
-- Device models (geometric shapes)
-- Device placement grid system
-- Device ownership/permissions
-- Basic UI menu
+### Phase 1: Hotbar + Basic Placement (MVP)
+- Hotbar UI with device items
+- Ghost model placement system
+- Device spawning (default Parts with naming)
+- Basic interaction (placeholder)
+- Server tracking of devices
 
-### Phase 2: Connection System
-- Cable connections between ports
-- Visual cable rendering (beam or line)
-- Connection validation
-- Delete connections
-
-### Phase 3: Configuration System
-- SurfaceGui panels on devices
-- Device-specific configuration UIs
-- Save/load configurations
+### Phase 2: Interaction + Configuration
+- Click detection on placed devices
+- Context menu (Remove/Configure/Info)
+- WinBox-style IP configuration panel
+- Device configuration storage
 - Config replication to players
 
-### Phase 4: Visualization & Simulation
-- Traffic flow particles
-- Bandwidth monitoring display
-- Network statistics dashboard
-- Ping/connectivity testing
+### Phase 3: Connectivity & Monitoring
+- Network connectivity checking algorithm
+- Ping/test between devices
+- Real-time monitoring UI
+- Device status indicators
 
-### Phase 5: Persistence
-- DataStore integration
-- Network save/load
-- Auto-save on changes
-- Export/import configs
-
-### Phase 6: Polish & Multiplayer
-- Multi-player device isolation
-- Smooth interactions
+### Phase 4: Persistence & Polish
+- Save/load networks (DataStore)
 - Performance optimization
-- UI improvements
+- UI polish
+- Multiplayer testing
 
 ---
 
@@ -101,97 +119,110 @@ Client updates visualization
 src/simulation-mikrotik/
 ├── server/
 │   ├── DeviceManager.luau
-│   ├── ConnectionManager.luau
 │   ├── ConfigurationManager.luau
 │   ├── SimulationEngine.luau
 │   ├── PersistenceManager.luau
 │   └── init.server.luau
 ├── client/
-│   ├── DeviceUI.luau
+│   ├── HotbarUI.luau
+│   ├── PlacementSystem.luau
+│   ├── InteractionUI.luau
 │   ├── ConfigPanel.luau
-│   ├── NetworkVisualization.luau
-│   ├── InputHandler.luau
+│   ├── DeviceRaycast.luau
 │   ├── CameraController.luau
+│   ├── MonitoringUI.luau
 │   └── init.client.luau
 └── shared/
     ├── DeviceTypes.luau
     ├── NetworkRemotes.luau
-    ├── Constants.luau
-    └── Utilities.luau
+    └── Constants.luau
 ```
 
 ---
 
 ## Device Specifications
 
+### PC
+- **Model:** Gray rectangular shape (10x2x8 studs)
+- **Color:** Gray
+- **Config:** IP address, hostname, gateway
+- **Role:** End device / workstation
+
+### Switch  
+- **Model:** Gray horizontal box (12x2x6 studs)
+- **Color:** Gray (lighter shade)
+- **Config:** IP address (management), VLAN
+- **Role:** Network switch
+
 ### Router
-- **Visual:** Blue cube with 4 labeled ports
-- **Ports:** 4 Ethernet
-- **Config:** IP address, gateway, static routes
-- **Logic:** Route packets between networks
-
-### Switch
-- **Visual:** Gray rectangular prism with 8+ ports
-- **Ports:** 8 or 16 Ethernet (configurable)
-- **Config:** Port VLAN, port mirroring, STP
-- **Logic:** Bridge frames between ports
-
-### Server
-- **Visual:** Green tower shape with 1 port
-- **Ports:** 1 Ethernet
-- **Config:** Service type, IP, open ports
-- **Logic:** End device/service provider
+- **Model:** Blue box (10x4x6 studs)
+- **Color:** Blue
+- **Config:** IP address, gateway, routes
+- **Role:** Gateway/routing device
 
 ### Firewall
-- **Visual:** Red box with 2 ports (IN/OUT)
-- **Ports:** 2 (WAN in, LAN out)
-- **Config:** Firewall rules, logging, policy
-- **Logic:** Filter and block traffic
+- **Model:** Red box (8x3x6 studs)
+- **Color:** Red
+- **Config:** IP address, filtering rules
+- **Role:** Security/filtering device
 
 ### Access Point
-- **Visual:** Yellow box with antenna representation
-- **Ports:** 1 Ethernet + wireless
-- **Config:** SSID, channel, power, security
-- **Logic:** Wireless bridge
+- **Model:** Yellow box with antenna (6x6x8 studs)
+- **Color:** Yellow
+- **Config:** IP address, SSID, channel
+- **Role:** Wireless access point
+
+### Server
+- **Model:** Green tower (6x6x10 studs)
+- **Color:** Green
+- **Config:** IP address, service type
+- **Role:** Network service provider
 
 ---
 
 ## UI/UX Design
 
-### Main Menu (Floating Panel)
+### Hotbar (Bottom Screen)
 ```
-┌─ Simulation Mikrotik ─────┐
-├─ Device Tools            │
-│  [+ Router] [+ Switch]    │
-│  [+ Server] [+ Firewall]  │
-│  [+ AP]     [🗑 Delete]   │
-├─ Tools                   │
-│  [🔧 Config] [📊 Stats]   │
-│  [🧪 Test] [💾 Save]     │
-└───────────────────────────┘
+┌─────────────────────────────────────────────┐
+│ [PC] [Switch] [Router] [Firewall] [AP] [Server] │
+└─────────────────────────────────────────────┘
 ```
 
-### Device Configuration Panel (SurfaceGui on Device)
+### Context Menu (on device click)
 ```
-┌─ Router Configuration ─┐
-├─ IP Address: [____] │
-├─ Gateway: [____]    │
-├─ Routes:           │
-│  [+ Add Route]      │
-├─ NAT Rules:        │
-│  [+ Add Rule]       │
-└─────────────────────┘
+┌──────────────────┐
+│  🔧 Configure    │
+│  ❌ Remove       │
+│  ⓘ View Info    │
+└──────────────────┘
 ```
 
-### Network Stats Dashboard
+### Configuration Panel (WinBox-style)
 ```
-┌─ Network Stats ────────┐
-├─ Active Devices: 5    │
-├─ Connections: 7       │
-├─ Total Bandwidth: 1Gbps│
-├─ Avg Latency: 2.5ms   │
-├─ Packet Loss: 0%      │
-└────────────────────────┘
+╔════════════════ PC Configuration ════════════════╗
+║                                                   ║
+║  Device Name: [PC-1________________]             ║
+║                                                   ║
+║  IP Address:    [192.168.1.100____]             ║
+║  Subnet Mask:   [255.255.255.0_____]            ║
+║  Gateway:       [192.168.1.1_______]            ║
+║                                                   ║
+║  [ DHCP ]  [ ✓ Save ]  [ ✗ Cancel ]            ║
+║                                                   ║
+╚═══════════════════════════════════════════════════╝
+```
+
+### Monitoring Panel
+```
+┌──────────────────────────────┐
+│  Network Status              │
+├──────────────────────────────┤
+│  Active Devices: 5           │
+│  Network Range: 192.168.1.0/24
+│  Gateway: 192.168.1.1       │
+│  Avg Latency: 2.5ms         │
+└──────────────────────────────┘
 ```
 
 ---
@@ -199,77 +230,77 @@ src/simulation-mikrotik/
 ## Interaction Flow
 
 ### Placing a Device
-1. Player clicks "+ Router" button
-2. Grid placement mode activated
-3. Player moves mouse → sees ghost router following
-4. Click to place → router appears
-5. Confirmation message
+1. Player clicks device button in hotbar
+2. PlacementSystem enters placement mode
+3. Ghost model appears, follows mouse
+4. Player clicks in world → device placed
+5. Server confirms placement
+6. All players see new device
 
-### Connecting Devices
-1. Player clicks port A (highlights)
-2. Player clicks port B (highlights)
-3. Cable draws between ports
-4. Connection stored server-side
-5. Visual connection confirmed
+### Configuring a Device
+1. Player clicks placed device in world
+2. Context menu appears (Remove/Configure/Info)
+3. Player clicks Configure
+4. ConfigPanel opens with WinBox-style interface
+5. Player enters IP address, gateway, etc
+6. Player clicks Save
+7. Panel closes, config stored server-side
+8. All players see updated device
 
-### Configuring Device
-1. Player clicks on device (highlights + outline)
-2. Configuration panel appears on device surface
-3. Player edits settings
-4. Click "Save" → updates server
-5. Changes replicate to all players
-
-### Testing Network
-1. Player clicks "Test" tool
-2. Select source device
-3. Select destination device
-4. Ping test runs
-5. Results show latency, packet loss, path
+### Removing a Device
+1. Player clicks placed device
+2. Context menu appears
+3. Player clicks Remove
+4. Device removed from world
+5. Server confirms deletion
+6. All players see device disappear
 
 ---
 
 ## Multiplayer Considerations
 
-### Isolation
-- Each player gets own "workspace" area
-- Devices are per-player owned
-- Can't modify other player devices
-- Can view but not edit others' networks
-
-### Sharing (Future)
-- Optional collaborative mode
-- Multiple players edit same network
-- Conflict resolution
-- Admin controls
+### Device Ownership
+- All devices visible to all players
+- Any player can interact with any device (for now)
+- Future: Per-player device ownership option
 
 ### Performance
-- Limit devices per player (20-50)
-- Limit connections per player (100)
-- LOD for distant networks
-- Cable pooling for efficiency
+- Unlimited device placement (but reasonable limits ~50 per player for now)
+- Simple Models (just Parts)
+- Efficient raycasting for click detection
+- Periodic save to avoid data loss
+
+### Sync
+- Real-time sync of device placement
+- Configuration changes replicate to all players
+- No cables/connections initially (future feature)
 
 ---
 
-## Success Metrics
+## Success Criteria
 
-✅ Can place 5 device types  
-✅ Can connect devices with visual cables  
-✅ Can configure each device type  
-✅ Network persists after logout  
-✅ Multi-player isolation works  
-✅ Real-time updates visible  
-✅ Smooth 60 FPS interaction  
-✅ UI intuitive and responsive  
+✅ Hotbar displays 6 device types  
+✅ Can place unlimited devices (within reason)  
+✅ Devices are named correctly  
+✅ Can remove placed devices  
+✅ Can configure IP addresses (WinBox-style UI)  
+✅ Configs saved and displayed  
+✅ Multi-player sync working  
+✅ Free camera movement  
+✅ Smooth 60 FPS  
+✅ Network saves on logout/rejoins  
 
 ---
 
 ## Future Enhancements
 
-- [ ] Animation for packet movement
-- [ ] Advanced simulation (BGP, OSPF)
-- [ ] Network templates/presets
+- [ ] Cable connections between devices
+- [ ] Visual network topology diagram
+- [ ] Traffic flow visualization
+- [ ] Advanced device configurations (DHCP, DNS, routes)
+- [ ] Ping/connectivity testing UI
+- [ ] Device grouping/organization
+- [ ] Device templates/presets
 - [ ] Collaborative networks
 - [ ] Troubleshooting challenges
-- [ ] Quiz integration
-- [ ] Leaderboards
-- [ ] Custom device creation
+- [ ] Leaderboards/achievements
