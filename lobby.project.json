@@ -1,0 +1,53 @@
+{
+  "name": "SekolahIndonesia-Lobby",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+
+    "ServerScriptService": {
+      "LobbyServer": {
+        "$path": "src/lobby/server"
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "LobbyClient": {
+          "$path": "src/lobby/client"
+        }
+      }
+    },
+
+    "Workspace": {
+      "$properties": {
+        "FilteringEnabled": true
+      },
+      "Lobby": {
+        "$className": "Model",
+        "$properties": {
+          "Name": "LobbyArea"
+        }
+      },
+      "Portals": {
+        "$className": "Folder",
+        "$properties": {
+          "Name": "Portals"
+        }
+      }
+    },
+
+    "Lighting": {
+      "$properties": {
+        "Ambient": [0, 0, 0],
+        "Brightness": 2,
+        "GlobalShadows": true,
+        "Technology": "Future"
+      }
+    }
+  }
+}

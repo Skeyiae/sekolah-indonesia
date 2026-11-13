@@ -1,0 +1,35 @@
+{
+  "name": "SekolahIndonesia-Quiz",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+
+    "ServerScriptService": {
+      "QuizServer": {
+        "$path": "src/quiz/server"
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "QuizClient": {
+          "$path": "src/quiz/client"
+        }
+      }
+    },
+
+    "Workspace": {
+      "$properties": {
+        "FilteringEnabled": true
+      },
+      "QuizArena": {
+        "$className": "Model"
+      }
+    }
+  }
+}
